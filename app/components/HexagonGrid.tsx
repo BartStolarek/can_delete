@@ -20,8 +20,13 @@ interface Hexagon {
   shouldOscillate: boolean;
   isStatic: boolean;
   opacity: number;
+  oscillationProgress: number;
   oscillationRate: number;
   oscillationDirection: number;
+  easingType: 'exponential' | 'logarithmic';
+  isWaiting: boolean;
+  waitTimer: number;
+  waitDuration: number;
   hoverOpacity: number;
   hoverTarget: number;
   color: 'red' | 'green' | null;
@@ -80,9 +85,19 @@ export function HexagonGrid({
         const isStatic = !shouldOscillate && Math.random() < 0.002; // 0.2% static
 
         let opacity = 0; // Default invisible
+        let oscillationProgress = 0;
+        let isWaiting = false;
+        let waitTimer = 0;
+        let waitDuration = 0;
+
         if (shouldOscillate) {
-          // Oscillating: start with random opacity between 0.05 and 0.4
-          opacity = 0.05 + Math.random() * 0.35;
+          // Oscillating: start with random progress
+          oscillationProgress = Math.random();
+          // Start some hexagons in waiting state
+          if (Math.random() < 0.3) {
+            isWaiting = true;
+            waitDuration = 1 + Math.random() * 9; // 1-10 seconds
+          }
         } else if (isStatic) {
           // Static: fixed random opacity between 0.05 and 0.4
           opacity = 0.05 + Math.random() * 0.35;
@@ -95,10 +110,16 @@ export function HexagonGrid({
           shouldOscillate,
           isStatic,
           opacity,
-          // Random oscillation rate (0.001 to 0.0022 per frame) - slow rate
-          oscillationRate: 0.001 + Math.random() * 0.0012,
+          oscillationProgress,
+          // Slower oscillation rate for smooth animation (0.0005 to 0.0015 per frame)
+          oscillationRate: 0.0005 + Math.random() * 0.001,
           // Random initial direction
           oscillationDirection: Math.random() > 0.5 ? 1 : -1,
+          // Randomly choose easing type
+          easingType: Math.random() > 0.5 ? 'exponential' : 'logarithmic',
+          isWaiting,
+          waitTimer,
+          waitDuration,
           hoverOpacity: 0,
           hoverTarget: 0,
           color: null,
@@ -118,9 +139,14 @@ export function HexagonGrid({
       // Random color (red or green)
       const color = Math.random() > 0.5 ? 'red' : 'green';
       hexagons[idx].color = color;
-      // Make colored hexagons oscillate
+      // Make colored hexagons oscillate with new properties
       hexagons[idx].shouldOscillate = true;
-      hexagons[idx].opacity = 0.05 + Math.random() * 0.35;
+      hexagons[idx].oscillationProgress = Math.random();
+      hexagons[idx].isWaiting = Math.random() < 0.3;
+      hexagons[idx].waitDuration = 1 + Math.random() * 9;
+      hexagons[idx].easingType = Math.random() > 0.5 ? 'exponential' : 'logarithmic';
+      hexagons[idx].oscillationRate = 0.0005 + Math.random() * 0.001;
+      hexagons[idx].oscillationDirection = Math.random() > 0.5 ? 1 : -1;
       colored.add(idx);
 
       // Add 1 or 2 neighbors (making pairs or threes)
@@ -134,7 +160,12 @@ export function HexagonGrid({
         if (neighborIdx >= 0 && neighborIdx < totalHexagons && !colored.has(neighborIdx)) {
           hexagons[neighborIdx].color = color;
           hexagons[neighborIdx].shouldOscillate = true;
-          hexagons[neighborIdx].opacity = 0.05 + Math.random() * 0.35;
+          hexagons[neighborIdx].oscillationProgress = Math.random();
+          hexagons[neighborIdx].isWaiting = Math.random() < 0.3;
+          hexagons[neighborIdx].waitDuration = 1 + Math.random() * 9;
+          hexagons[neighborIdx].easingType = Math.random() > 0.5 ? 'exponential' : 'logarithmic';
+          hexagons[neighborIdx].oscillationRate = 0.0005 + Math.random() * 0.001;
+          hexagons[neighborIdx].oscillationDirection = Math.random() > 0.5 ? 1 : -1;
           colored.add(neighborIdx);
         }
       }
@@ -305,13 +336,18 @@ export function HexagonGrid({
           hex.shouldOscillate = Math.random() < 0.002;
           hex.isStatic = !hex.shouldOscillate && Math.random() < 0.002;
           if (hex.shouldOscillate) {
-            hex.opacity = 0.05 + Math.random() * 0.35;
+            hex.oscillationProgress = Math.random();
+            hex.isWaiting = Math.random() < 0.3;
+            hex.waitDuration = 1 + Math.random() * 9;
+            hex.waitTimer = 0;
+            hex.easingType = Math.random() > 0.5 ? 'exponential' : 'logarithmic';
+            hex.oscillationRate = 0.0005 + Math.random() * 0.001;
+            hex.oscillationDirection = Math.random() > 0.5 ? 1 : -1;
           } else if (hex.isStatic) {
             hex.opacity = 0.05 + Math.random() * 0.35;
           } else {
             hex.opacity = 0;
           }
-          hex.oscillationRate = 0.001 + Math.random() * 0.0012;
           hex.oscillationDirection = Math.random() > 0.5 ? 1 : -1;
           hex.shouldHover = Math.random() < staticHexChance;
           hex.hoverOpacity = 0;
@@ -324,13 +360,18 @@ export function HexagonGrid({
           hex.shouldOscillate = Math.random() < 0.002;
           hex.isStatic = !hex.shouldOscillate && Math.random() < 0.002;
           if (hex.shouldOscillate) {
-            hex.opacity = 0.05 + Math.random() * 0.35;
+            hex.oscillationProgress = Math.random();
+            hex.isWaiting = Math.random() < 0.3;
+            hex.waitDuration = 1 + Math.random() * 9;
+            hex.waitTimer = 0;
+            hex.easingType = Math.random() > 0.5 ? 'exponential' : 'logarithmic';
+            hex.oscillationRate = 0.0005 + Math.random() * 0.001;
+            hex.oscillationDirection = Math.random() > 0.5 ? 1 : -1;
           } else if (hex.isStatic) {
             hex.opacity = 0.05 + Math.random() * 0.35;
           } else {
             hex.opacity = 0;
           }
-          hex.oscillationRate = 0.001 + Math.random() * 0.0012;
           hex.oscillationDirection = Math.random() > 0.5 ? 1 : -1;
           hex.shouldHover = Math.random() < staticHexChance;
           hex.hoverOpacity = 0;
@@ -366,15 +407,47 @@ export function HexagonGrid({
 
         // Update oscillating opacity (only if shouldOscillate is true)
         if (hex.shouldOscillate) {
-          hex.opacity += hex.oscillationRate * hex.oscillationDirection * deltaTime * 60;
+          if (hex.isWaiting) {
+            // Wait at 0% opacity
+            hex.opacity = 0;
+            hex.waitTimer += deltaTime;
 
-          // Reverse direction when hitting boundaries (0.05 to 0.4)
-          if (hex.opacity >= 0.4) {
-            hex.opacity = 0.4;
-            hex.oscillationDirection = -1;
-          } else if (hex.opacity <= 0.05) {
-            hex.opacity = 0.05;
-            hex.oscillationDirection = 1;
+            // Exit waiting state when timer expires
+            if (hex.waitTimer >= hex.waitDuration) {
+              hex.isWaiting = false;
+              hex.waitTimer = 0;
+              hex.oscillationProgress = 0;
+              hex.oscillationDirection = 1;
+            }
+          } else {
+            // Update progress linearly
+            hex.oscillationProgress += hex.oscillationRate * hex.oscillationDirection * deltaTime * 60;
+
+            // Handle boundaries
+            if (hex.oscillationProgress >= 1.0) {
+              hex.oscillationProgress = 1.0;
+              hex.oscillationDirection = -1;
+            } else if (hex.oscillationProgress <= 0.0) {
+              hex.oscillationProgress = 0.0;
+              // Start waiting period at 0%
+              hex.isWaiting = true;
+              hex.waitDuration = 1 + Math.random() * 9; // 1-10 seconds
+              hex.waitTimer = 0;
+            }
+
+            // Apply easing function to convert progress to opacity (0 to 0.4)
+            let easedProgress = hex.oscillationProgress;
+            if (hex.easingType === 'exponential') {
+              // Exponential ease in-out: fast at ends, slow in middle
+              easedProgress = easedProgress < 0.5
+                ? 2 * easedProgress * easedProgress
+                : 1 - Math.pow(-2 * easedProgress + 2, 2) / 2;
+            } else {
+              // Logarithmic-like ease in-out: slow at ends, fast in middle
+              easedProgress = (Math.sin((easedProgress - 0.5) * Math.PI) + 1) / 2;
+            }
+
+            hex.opacity = easedProgress * 0.4; // Map 0-1 progress to 0-0.4 opacity
           }
         }
 
