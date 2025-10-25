@@ -124,8 +124,9 @@ export function HexagonGrid({
   ) => {
     // Much fainter base brightness with subtle wave glow
     const brightness = 0.08 + wave * 0.08;
-    // Subtle upward movement on wave
-    const yOffset = -wave * 2;
+    // Oscillating movement: up when wave brightens, down when wave dims
+    // Centers around 0 so it moves both up and down
+    const yOffset = -(wave - 0.5) * 4;
 
     ctx.save();
     ctx.translate(x, y + yOffset + waveOffset);
