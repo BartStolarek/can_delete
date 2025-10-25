@@ -81,8 +81,8 @@ export function HexagonGrid({
         const y = row * verticalSpacing;
 
         const shouldHover = Math.random() < staticHexChance;
-        const shouldOscillate = Math.random() < 0.002; // 0.2% oscillate
-        const isStatic = !shouldOscillate && Math.random() < 0.002; // 0.2% static
+        const shouldOscillate = Math.random() < 0.01; // 1% oscillate (blue)
+        const isStatic = !shouldOscillate && Math.random() < 0.01; // 1% static (blue)
 
         let opacity = 0; // Default invisible
         let oscillationProgress = 0;
@@ -127,9 +127,9 @@ export function HexagonGrid({
       }
     }
 
-    // Add colored hexagons (1%) in pairs or threes
+    // Add colored hexagons (0.2%) in pairs or threes
     const totalHexagons = hexagons.length;
-    const coloredCount = Math.floor(totalHexagons * 0.01);
+    const coloredCount = Math.floor(totalHexagons * 0.002);
     const colored = new Set<number>();
 
     for (let i = 0; i < coloredCount; i++) {
@@ -333,8 +333,8 @@ export function HexagonGrid({
         if (screenX < -hexWidth * 3) {
           hex.x += hexWidth * (Math.ceil(canvasSize.width / hexWidth) + 4);
           // Regenerate random properties for wrapped hexagons
-          hex.shouldOscillate = Math.random() < 0.002;
-          hex.isStatic = !hex.shouldOscillate && Math.random() < 0.002;
+          hex.shouldOscillate = Math.random() < 0.01;
+          hex.isStatic = !hex.shouldOscillate && Math.random() < 0.01;
           if (hex.shouldOscillate) {
             hex.oscillationProgress = Math.random();
             hex.isWaiting = Math.random() < 0.3;
@@ -357,8 +357,8 @@ export function HexagonGrid({
         if (screenY < -hexHeight * 3) {
           hex.y += verticalSpacing * (Math.ceil(canvasSize.height / verticalSpacing) + 4);
           // Regenerate random properties for wrapped hexagons
-          hex.shouldOscillate = Math.random() < 0.002;
-          hex.isStatic = !hex.shouldOscillate && Math.random() < 0.002;
+          hex.shouldOscillate = Math.random() < 0.01;
+          hex.isStatic = !hex.shouldOscillate && Math.random() < 0.01;
           if (hex.shouldOscillate) {
             hex.oscillationProgress = Math.random();
             hex.isWaiting = Math.random() < 0.3;
