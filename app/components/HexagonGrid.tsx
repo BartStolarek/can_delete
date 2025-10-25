@@ -18,6 +18,7 @@ interface Hexagon {
   y: number;
   shouldHover: boolean;
   shouldOscillate: boolean;
+  isStatic: boolean;
   opacity: number;
   oscillationRate: number;
   oscillationDirection: number;
@@ -68,22 +69,32 @@ export function HexagonGrid({
     const cols = Math.ceil(width / hexWidth) + 2;
     const rows = Math.ceil(height / verticalSpacing) + 2;
 
-    // Create all hexagons - only 1% oscillate, rest are invisible
+    // Create all hexagons - 0.2% oscillate, 0.2% static, rest invisible
     for (let row = -1; row < rows; row++) {
       for (let col = -1; col < cols; col++) {
         const x = col * hexWidth + (row % 2) * (hexWidth / 2);
         const y = row * verticalSpacing;
 
         const shouldHover = Math.random() < staticHexChance;
-        const shouldOscillate = Math.random() < 0.01; // Only 1% oscillate
+        const shouldOscillate = Math.random() < 0.002; // 0.2% oscillate
+        const isStatic = !shouldOscillate && Math.random() < 0.002; // 0.2% static
+
+        let opacity = 0; // Default invisible
+        if (shouldOscillate) {
+          // Oscillating: start with random opacity between 0.05 and 0.4
+          opacity = 0.05 + Math.random() * 0.35;
+        } else if (isStatic) {
+          // Static: fixed random opacity between 0.05 and 0.4
+          opacity = 0.05 + Math.random() * 0.35;
+        }
 
         hexagons.push({
           x,
           y,
           shouldHover,
           shouldOscillate,
-          // If oscillating, start with random opacity between 0.05 and 0.4, otherwise invisible
-          opacity: shouldOscillate ? 0.05 + Math.random() * 0.35 : 0,
+          isStatic,
+          opacity,
           // Random oscillation rate (0.001 to 0.0022 per frame) - slow rate
           oscillationRate: 0.001 + Math.random() * 0.0012,
           // Random initial direction
@@ -291,8 +302,15 @@ export function HexagonGrid({
         if (screenX < -hexWidth * 3) {
           hex.x += hexWidth * (Math.ceil(canvasSize.width / hexWidth) + 4);
           // Regenerate random properties for wrapped hexagons
-          hex.shouldOscillate = Math.random() < 0.01;
-          hex.opacity = hex.shouldOscillate ? 0.05 + Math.random() * 0.35 : 0;
+          hex.shouldOscillate = Math.random() < 0.002;
+          hex.isStatic = !hex.shouldOscillate && Math.random() < 0.002;
+          if (hex.shouldOscillate) {
+            hex.opacity = 0.05 + Math.random() * 0.35;
+          } else if (hex.isStatic) {
+            hex.opacity = 0.05 + Math.random() * 0.35;
+          } else {
+            hex.opacity = 0;
+          }
           hex.oscillationRate = 0.001 + Math.random() * 0.0012;
           hex.oscillationDirection = Math.random() > 0.5 ? 1 : -1;
           hex.shouldHover = Math.random() < staticHexChance;
@@ -303,8 +321,15 @@ export function HexagonGrid({
         if (screenY < -hexHeight * 3) {
           hex.y += verticalSpacing * (Math.ceil(canvasSize.height / verticalSpacing) + 4);
           // Regenerate random properties for wrapped hexagons
-          hex.shouldOscillate = Math.random() < 0.01;
-          hex.opacity = hex.shouldOscillate ? 0.05 + Math.random() * 0.35 : 0;
+          hex.shouldOscillate = Math.random() < 0.002;
+          hex.isStatic = !hex.shouldOscillate && Math.random() < 0.002;
+          if (hex.shouldOscillate) {
+            hex.opacity = 0.05 + Math.random() * 0.35;
+          } else if (hex.isStatic) {
+            hex.opacity = 0.05 + Math.random() * 0.35;
+          } else {
+            hex.opacity = 0;
+          }
           hex.oscillationRate = 0.001 + Math.random() * 0.0012;
           hex.oscillationDirection = Math.random() > 0.5 ? 1 : -1;
           hex.shouldHover = Math.random() < staticHexChance;
