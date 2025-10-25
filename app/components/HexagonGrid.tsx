@@ -124,12 +124,9 @@ export function HexagonGrid({
   ) => {
     // More noticeable brightness oscillation with wave
     const brightness = 0.06 + wave * 0.2;
-    // More noticeable oscillating movement: up when wave brightens, down when wave dims
-    // Centers around 0 so it moves both up and down
-    const yOffset = -(wave - 0.5) * 12;
 
     ctx.save();
-    ctx.translate(x, y + yOffset);
+    ctx.translate(x, y);
 
     // Draw simple dot (circle)
     ctx.beginPath();
@@ -251,30 +248,7 @@ export function HexagonGrid({
         }
       });
 
-      // Draw stars at vertices with wave effect
-      hexagonsRef.current.forEach((hex) => {
-        const screenX = hex.x - offsetRef.current.x;
-        const screenY = hex.y - offsetRef.current.y;
-
-        if (
-          screenX > -hexWidth &&
-          screenX < canvasSize.width + hexWidth &&
-          screenY > -hexHeight &&
-          screenY < canvasSize.height + hexHeight
-        ) {
-          const vertices = getHexagonVertices(screenX, screenY, hexSize);
-          vertices.forEach((vertex, i) => {
-            // Wavelength about 1/3 of viewport, with spacing between waves
-            const rawWave =
-              (Math.sin(waveTimeRef.current + vertex.x * 0.01 + vertex.y * 0.01) + 1) / 2;
-            // Use power function to create gaps - wave spends more time at low values
-            const wave = Math.pow(rawWave, 4);
-            drawStar(ctx, vertex.x, vertex.y, 1.5, wave);
-          });
-        }
-      });
-
-      // Update and draw hexagons
+      // Draw hexagons and stars together with unified wave motion
       hexagonsRef.current.forEach((hex) => {
         const screenX = hex.x - offsetRef.current.x;
         const screenY = hex.y - offsetRef.current.y;
@@ -288,6 +262,18 @@ export function HexagonGrid({
         ) {
           return;
         }
+
+        // Calculate wave offset once per hexagon based on center position
+        const rawWave =
+          (Math.sin(waveTimeRef.current + screenX * 0.01 + screenY * 0.01) + 1) / 2;
+        const wave = Math.pow(rawWave, 4);
+        const yOffset = -(wave - 0.5) * 12;
+
+        // Draw stars at vertices with the same wave offset as the hexagon
+        const vertices = getHexagonVertices(screenX, screenY, hexSize);
+        vertices.forEach((vertex, i) => {
+          drawStar(ctx, vertex.x, vertex.y + yOffset, 1.5, wave);
+        });
 
         // Update hover with delay
         if (hex.shouldHover) {
@@ -304,15 +290,9 @@ export function HexagonGrid({
           hex.hoverOpacity += (hex.hoverTarget - hex.hoverOpacity) * hoverSpeed * deltaTime * 60;
         }
 
-        // Calculate wave offset for hexagon (same as stars)
-        const rawWave =
-          (Math.sin(waveTimeRef.current + screenX * 0.01 + screenY * 0.01) + 1) / 2;
-        const wave = Math.pow(rawWave, 4);
-        const hexYOffset = -(wave - 0.5) * 12;
-
         // Draw hexagon with combined opacity and wave offset
         const finalOpacity = Math.max(hex.opacity, hex.hoverOpacity);
-        drawHexagon(ctx, screenX, screenY, hexSize, finalOpacity, hexYOffset);
+        drawHexagon(ctx, screenX, screenY, hexSize, finalOpacity, yOffset);
       });
 
       animationRef.current = requestAnimationFrame(animate);
