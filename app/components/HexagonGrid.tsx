@@ -263,9 +263,9 @@ export function HexagonGrid({
         ) {
           const vertices = getHexagonVertices(screenX, screenY, hexSize);
           vertices.forEach((vertex, i) => {
-            // Much longer wavelength (less frequent waves)
+            // Wavelength about 1/3 of viewport
             const wave =
-              (Math.sin(waveTimeRef.current + vertex.x * 0.001 + vertex.y * 0.001) + 1) / 2;
+              (Math.sin(waveTimeRef.current + vertex.x * 0.01 + vertex.y * 0.01) + 1) / 2;
             drawStar(ctx, vertex.x, vertex.y, 1.5, wave);
           });
         }
