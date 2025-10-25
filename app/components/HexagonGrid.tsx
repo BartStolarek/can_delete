@@ -120,16 +120,15 @@ export function HexagonGrid({
     y: number,
     size: number,
     wave: number,
-    waveOffset: number,
   ) => {
-    // Much fainter base brightness with subtle wave glow
-    const brightness = 0.08 + wave * 0.08;
-    // Oscillating movement: up when wave brightens, down when wave dims
+    // More noticeable brightness oscillation with wave
+    const brightness = 0.06 + wave * 0.2;
+    // More noticeable oscillating movement: up when wave brightens, down when wave dims
     // Centers around 0 so it moves both up and down
-    const yOffset = -(wave - 0.5) * 4;
+    const yOffset = -(wave - 0.5) * 8;
 
     ctx.save();
-    ctx.translate(x, y + yOffset + waveOffset);
+    ctx.translate(x, y + yOffset);
 
     // Draw simple dot (circle)
     ctx.beginPath();
@@ -212,8 +211,8 @@ export function HexagonGrid({
       offsetRef.current.x += panSpeed * deltaTime * 60;
       offsetRef.current.y += panSpeed * deltaTime * 60;
 
-      // Update wave time
-      waveTimeRef.current += deltaTime * 2;
+      // Update wave time - slower wave animation
+      waveTimeRef.current += deltaTime * 0.5;
 
       // Clear canvas
       ctx.fillStyle = backgroundColor;
@@ -264,11 +263,10 @@ export function HexagonGrid({
         ) {
           const vertices = getHexagonVertices(screenX, screenY, hexSize);
           vertices.forEach((vertex, i) => {
-            // Longer wavelength (smaller frequency), more subtle wave
+            // Much longer wavelength (less frequent waves)
             const wave =
-              (Math.sin(waveTimeRef.current + vertex.x * 0.003 + vertex.y * 0.003) + 1) / 2;
-            const waveOffset = Math.sin(waveTimeRef.current * 0.5 + vertex.x * 0.002) * 1;
-            drawStar(ctx, vertex.x, vertex.y, 1.5, wave, waveOffset);
+              (Math.sin(waveTimeRef.current + vertex.x * 0.001 + vertex.y * 0.001) + 1) / 2;
+            drawStar(ctx, vertex.x, vertex.y, 1.5, wave);
           });
         }
       });
