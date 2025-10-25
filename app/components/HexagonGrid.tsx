@@ -4,8 +4,7 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 
 interface HexagonGridProps {
   hexSize?: number;
-  flickerChance?: number;
-  flickerSpeed?: number;
+  staticHexChance?: number;
   panSpeed?: number;
   backgroundColor?: string;
   hexagonColor?: string;
@@ -17,19 +16,16 @@ interface HexagonGridProps {
 interface Hexagon {
   x: number;
   y: number;
-  shouldFlicker: boolean;
+  hasStaticOpacity: boolean;
   shouldHover: boolean;
   opacity: number;
-  targetOpacity: number;
-  flickerTimer: number;
   hoverOpacity: number;
   hoverTarget: number;
 }
 
 export function HexagonGrid({
   hexSize = 30,
-  flickerChance = 0.05,
-  flickerSpeed = 0.02,
+  staticHexChance = 0.01,
   panSpeed = 0.15,
   backgroundColor = '#0f0a1a',
   hexagonColor = '#3b82f6',
@@ -74,17 +70,16 @@ export function HexagonGrid({
         const x = col * hexWidth + (row % 2) * (hexWidth / 2);
         const y = row * verticalSpacing;
 
-        const shouldFlicker = Math.random() < flickerChance;
-        const shouldHover = Math.random() < flickerChance;
+        const hasStaticOpacity = Math.random() < staticHexChance;
+        const shouldHover = Math.random() < staticHexChance;
 
         hexagons.push({
           x,
           y,
-          shouldFlicker,
+          hasStaticOpacity,
           shouldHover,
-          opacity: shouldFlicker ? Math.random() * 0.8 : 0,
-          targetOpacity: 0,
-          flickerTimer: Math.random() * 100,
+          // Static opacity between 0 and 0.5 for 1% of hexagons
+          opacity: hasStaticOpacity ? Math.random() * 0.5 : 0,
           hoverOpacity: 0,
           hoverTarget: 0,
         });
@@ -92,7 +87,7 @@ export function HexagonGrid({
     }
 
     hexagonsRef.current = hexagons;
-  }, [hexSize, flickerChance]);
+  }, [hexSize, staticHexChance]);
 
   // Draw a hexagon
   const drawHexagon = useCallback((
@@ -125,30 +120,19 @@ export function HexagonGrid({
     y: number,
     size: number,
     wave: number,
+    waveOffset: number,
   ) => {
-    const brightness = 0.3 + wave * 0.4;
-    const actualSize = size * (0.8 + wave * 0.3);
+    // Much fainter base brightness with subtle wave glow
+    const brightness = 0.08 + wave * 0.08;
+    // Subtle upward movement on wave
+    const yOffset = -wave * 2;
 
     ctx.save();
-    ctx.translate(x, y);
+    ctx.translate(x, y + yOffset + waveOffset);
 
-    // Draw 4-pointed star
+    // Draw simple dot (circle)
     ctx.beginPath();
-    for (let i = 0; i < 4; i++) {
-      const angle = (Math.PI / 2) * i;
-      const outerX = Math.cos(angle) * actualSize;
-      const outerY = Math.sin(angle) * actualSize;
-      const innerAngle = angle + Math.PI / 4;
-      const innerX = Math.cos(innerAngle) * actualSize * 0.3;
-      const innerY = Math.sin(innerAngle) * actualSize * 0.3;
-
-      if (i === 0) {
-        ctx.moveTo(outerX, outerY);
-      } else {
-        ctx.lineTo(outerX, outerY);
-      }
-      ctx.lineTo(innerX, innerY);
-    }
+    ctx.arc(0, 0, size, 0, Math.PI * 2);
     ctx.closePath();
 
     ctx.fillStyle = starColor.includes('rgba')
@@ -223,9 +207,9 @@ export function HexagonGrid({
       const deltaTime = (currentTime - lastTime) / 1000;
       lastTime = currentTime;
 
-      // Update pan offset
-      offsetRef.current.x = (offsetRef.current.x + panSpeed * deltaTime * 60) % (hexSize * Math.sqrt(3));
-      offsetRef.current.y = (offsetRef.current.y + panSpeed * deltaTime * 60) % (hexSize * 1.5);
+      // Update pan offset - continuous movement northwest (no modulo)
+      offsetRef.current.x += panSpeed * deltaTime * 60;
+      offsetRef.current.y += panSpeed * deltaTime * 60;
 
       // Update wave time
       waveTimeRef.current += deltaTime * 2;
@@ -237,6 +221,34 @@ export function HexagonGrid({
       const hexWidth = hexSize * Math.sqrt(3);
       const hexHeight = hexSize * 2;
       const verticalSpacing = hexHeight * 0.75;
+
+      // Wrap hexagons that have moved off-screen to the northwest
+      hexagonsRef.current.forEach((hex) => {
+        const screenX = hex.x - offsetRef.current.x;
+        const screenY = hex.y - offsetRef.current.y;
+
+        // If hexagon is too far off the northwest edge, wrap it to the southeast
+        if (screenX < -hexWidth * 3) {
+          hex.x += hexWidth * (Math.ceil(canvasSize.width / hexWidth) + 4);
+          // Regenerate random properties for wrapped hexagons
+          const hasStaticOpacity = Math.random() < staticHexChance;
+          hex.hasStaticOpacity = hasStaticOpacity;
+          hex.opacity = hasStaticOpacity ? Math.random() * 0.5 : 0;
+          hex.shouldHover = Math.random() < staticHexChance;
+          hex.hoverOpacity = 0;
+          hex.hoverTarget = 0;
+        }
+        if (screenY < -hexHeight * 3) {
+          hex.y += verticalSpacing * (Math.ceil(canvasSize.height / verticalSpacing) + 4);
+          // Regenerate random properties for wrapped hexagons
+          const hasStaticOpacity = Math.random() < staticHexChance;
+          hex.hasStaticOpacity = hasStaticOpacity;
+          hex.opacity = hasStaticOpacity ? Math.random() * 0.5 : 0;
+          hex.shouldHover = Math.random() < staticHexChance;
+          hex.hoverOpacity = 0;
+          hex.hoverTarget = 0;
+        }
+      });
 
       // Draw stars at vertices with wave effect
       hexagonsRef.current.forEach((hex) => {
@@ -251,9 +263,11 @@ export function HexagonGrid({
         ) {
           const vertices = getHexagonVertices(screenX, screenY, hexSize);
           vertices.forEach((vertex, i) => {
+            // Longer wavelength (smaller frequency), more subtle wave
             const wave =
-              (Math.sin(waveTimeRef.current + vertex.x * 0.01 + vertex.y * 0.01) + 1) / 2;
-            drawStar(ctx, vertex.x, vertex.y, 2, wave);
+              (Math.sin(waveTimeRef.current + vertex.x * 0.003 + vertex.y * 0.003) + 1) / 2;
+            const waveOffset = Math.sin(waveTimeRef.current * 0.5 + vertex.x * 0.002) * 1;
+            drawStar(ctx, vertex.x, vertex.y, 1.5, wave, waveOffset);
           });
         }
       });
@@ -271,19 +285,6 @@ export function HexagonGrid({
           screenY > canvasSize.height + hexHeight
         ) {
           return;
-        }
-
-        // Update flicker
-        if (hex.shouldFlicker) {
-          hex.flickerTimer += deltaTime * 60;
-          if (hex.flickerTimer > 60 + Math.random() * 120) {
-            hex.flickerTimer = 0;
-            hex.targetOpacity = Math.random() > 0.5 ? 0.6 + Math.random() * 0.4 : 0;
-          }
-
-          if (Math.abs(hex.opacity - hex.targetOpacity) > 0.01) {
-            hex.opacity += (hex.targetOpacity - hex.opacity) * flickerSpeed;
-          }
         }
 
         // Update hover with delay
@@ -321,10 +322,10 @@ export function HexagonGrid({
     };
   }, [
     hexSize,
-    flickerSpeed,
     panSpeed,
     backgroundColor,
     hoverDelay,
+    staticHexChance,
     canvasSize.width,
     canvasSize.height,
     initializeGrid,

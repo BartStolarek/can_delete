@@ -7,8 +7,7 @@ export default function Home() {
     <main className="w-screen h-screen overflow-hidden">
       <HexagonGrid
         hexSize={30}
-        flickerChance={0.05}
-        flickerSpeed={0.02}
+        staticHexChance={0.01}
         panSpeed={0.15}
         backgroundColor="#0f0a1a"
         hexagonColor="#3b82f6"
@@ -22,9 +21,9 @@ export default function Home() {
           Move your mouse to interact with the hover-responsive hexagons
         </p>
         <div className="text-xs space-y-2 text-gray-400">
-          <p>• ~10% of hexagons are active (flickering or hover-responsive)</p>
-          <p>• Stars pulse with wave animations at vertices</p>
-          <p>• Grid slowly pans diagonally</p>
+          <p>• 1% of hexagons have subtle static transparency</p>
+          <p>• Faint stars with gentle wave animations at vertices</p>
+          <p>• Grid continuously floats northwest</p>
           <p>• Mouse creates trailing light effect</p>
         </div>
       </div>
