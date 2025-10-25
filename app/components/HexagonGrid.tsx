@@ -96,11 +96,12 @@ export function HexagonGrid({
     cy: number,
     size: number,
     opacity: number,
+    yOffset: number = 0,
   ) => {
     if (opacity <= 0.01) return;
 
     ctx.beginPath();
-    const vertices = getHexagonVertices(cx, cy, size);
+    const vertices = getHexagonVertices(cx, cy + yOffset, size);
     ctx.moveTo(vertices[0].x, vertices[0].y);
     for (let i = 1; i < vertices.length; i++) {
       ctx.lineTo(vertices[i].x, vertices[i].y);
@@ -303,9 +304,15 @@ export function HexagonGrid({
           hex.hoverOpacity += (hex.hoverTarget - hex.hoverOpacity) * hoverSpeed * deltaTime * 60;
         }
 
-        // Draw hexagon with combined opacity
+        // Calculate wave offset for hexagon (same as stars)
+        const rawWave =
+          (Math.sin(waveTimeRef.current + screenX * 0.01 + screenY * 0.01) + 1) / 2;
+        const wave = Math.pow(rawWave, 4);
+        const hexYOffset = -(wave - 0.5) * 12;
+
+        // Draw hexagon with combined opacity and wave offset
         const finalOpacity = Math.max(hex.opacity, hex.hoverOpacity);
-        drawHexagon(ctx, screenX, screenY, hexSize, finalOpacity);
+        drawHexagon(ctx, screenX, screenY, hexSize, finalOpacity, hexYOffset);
       });
 
       animationRef.current = requestAnimationFrame(animate);
