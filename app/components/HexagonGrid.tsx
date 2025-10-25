@@ -125,7 +125,7 @@ export function HexagonGrid({
     const brightness = 0.06 + wave * 0.2;
     // More noticeable oscillating movement: up when wave brightens, down when wave dims
     // Centers around 0 so it moves both up and down
-    const yOffset = -(wave - 0.5) * 8;
+    const yOffset = -(wave - 0.5) * 12;
 
     ctx.save();
     ctx.translate(x, y + yOffset);
@@ -263,9 +263,11 @@ export function HexagonGrid({
         ) {
           const vertices = getHexagonVertices(screenX, screenY, hexSize);
           vertices.forEach((vertex, i) => {
-            // Wavelength about 1/3 of viewport
-            const wave =
+            // Wavelength about 1/3 of viewport, with spacing between waves
+            const rawWave =
               (Math.sin(waveTimeRef.current + vertex.x * 0.01 + vertex.y * 0.01) + 1) / 2;
+            // Use power function to create gaps - wave spends more time at low values
+            const wave = Math.pow(rawWave, 4);
             drawStar(ctx, vertex.x, vertex.y, 1.5, wave);
           });
         }
