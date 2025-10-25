@@ -4,8 +4,7 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 
 interface HexagonGridProps {
   hexSize?: number;
-  flickerChance?: number;
-  flickerSpeed?: number;
+  staticHexChance?: number;
   panSpeed?: number;
   backgroundColor?: string;
   hexagonColor?: string;
@@ -17,19 +16,25 @@ interface HexagonGridProps {
 interface Hexagon {
   x: number;
   y: number;
-  shouldFlicker: boolean;
   shouldHover: boolean;
+  shouldOscillate: boolean;
+  isStatic: boolean;
   opacity: number;
-  targetOpacity: number;
-  flickerTimer: number;
+  oscillationProgress: number;
+  oscillationRate: number;
+  oscillationDirection: number;
+  easingType: 'exponential' | 'logarithmic';
+  isWaiting: boolean;
+  waitTimer: number;
+  waitDuration: number;
   hoverOpacity: number;
   hoverTarget: number;
+  color: 'red' | 'green' | null;
 }
 
 export function HexagonGrid({
   hexSize = 30,
-  flickerChance = 0.05,
-  flickerSpeed = 0.02,
+  staticHexChance = 0.01,
   panSpeed = 0.15,
   backgroundColor = '#0f0a1a',
   hexagonColor = '#3b82f6',
@@ -69,52 +74,137 @@ export function HexagonGrid({
     const cols = Math.ceil(width / hexWidth) + 2;
     const rows = Math.ceil(height / verticalSpacing) + 2;
 
+    // Create all hexagons - 0.2% oscillate, 0.2% static, rest invisible
     for (let row = -1; row < rows; row++) {
       for (let col = -1; col < cols; col++) {
         const x = col * hexWidth + (row % 2) * (hexWidth / 2);
         const y = row * verticalSpacing;
 
-        const shouldFlicker = Math.random() < flickerChance;
-        const shouldHover = Math.random() < flickerChance;
+        const shouldHover = Math.random() < staticHexChance;
+        const shouldOscillate = Math.random() < 0.01; // 1% oscillate (blue)
+        const isStatic = !shouldOscillate && Math.random() < 0.01; // 1% static (blue)
+
+        let opacity = 0; // Default invisible
+        let oscillationProgress = 0;
+        let isWaiting = false;
+        let waitTimer = 0;
+        let waitDuration = 0;
+
+        if (shouldOscillate) {
+          // Oscillating: start with random progress
+          oscillationProgress = Math.random();
+          // Start some hexagons in waiting state
+          if (Math.random() < 0.3) {
+            isWaiting = true;
+            waitDuration = 1 + Math.random() * 9; // 1-10 seconds
+          }
+        } else if (isStatic) {
+          // Static: fixed random opacity between 0.05 and 0.4
+          opacity = 0.05 + Math.random() * 0.35;
+        }
 
         hexagons.push({
           x,
           y,
-          shouldFlicker,
           shouldHover,
-          opacity: shouldFlicker ? Math.random() * 0.8 : 0,
-          targetOpacity: 0,
-          flickerTimer: Math.random() * 100,
+          shouldOscillate,
+          isStatic,
+          opacity,
+          oscillationProgress,
+          // Slower oscillation rate for smooth animation (0.0005 to 0.0015 per frame)
+          oscillationRate: 0.0005 + Math.random() * 0.001,
+          // Random initial direction
+          oscillationDirection: Math.random() > 0.5 ? 1 : -1,
+          // Randomly choose easing type
+          easingType: Math.random() > 0.5 ? 'exponential' : 'logarithmic',
+          isWaiting,
+          waitTimer,
+          waitDuration,
           hoverOpacity: 0,
           hoverTarget: 0,
+          color: null,
         });
       }
     }
 
-    hexagonsRef.current = hexagons;
-  }, [hexSize, flickerChance]);
+    // Add colored hexagons (0.2%) in pairs or threes
+    const totalHexagons = hexagons.length;
+    const coloredCount = Math.floor(totalHexagons * 0.002);
+    const colored = new Set<number>();
 
-  // Draw a hexagon
+    for (let i = 0; i < coloredCount; i++) {
+      const idx = Math.floor(Math.random() * totalHexagons);
+      if (colored.has(idx)) continue;
+
+      // Random color (red or green)
+      const color = Math.random() > 0.5 ? 'red' : 'green';
+      hexagons[idx].color = color;
+      // Make colored hexagons static with fixed random transparency (5-40%)
+      hexagons[idx].isStatic = true;
+      hexagons[idx].opacity = 0.05 + Math.random() * 0.35;
+      colored.add(idx);
+
+      // Add 1 or 2 neighbors (making pairs or threes)
+      const neighborsToAdd = Math.random() > 0.5 ? 1 : 2;
+
+      for (let j = 0; j < neighborsToAdd; j++) {
+        // Try to find a nearby hexagon
+        const offset = (j + 1) * (Math.random() > 0.5 ? 1 : -1);
+        const neighborIdx = idx + offset;
+
+        if (neighborIdx >= 0 && neighborIdx < totalHexagons && !colored.has(neighborIdx)) {
+          hexagons[neighborIdx].color = color;
+          hexagons[neighborIdx].isStatic = true;
+          hexagons[neighborIdx].opacity = 0.05 + Math.random() * 0.35;
+          colored.add(neighborIdx);
+        }
+      }
+    }
+
+    hexagonsRef.current = hexagons;
+  }, [hexSize, staticHexChance]);
+
+  // Draw a hexagon with wave distortion
   const drawHexagon = useCallback((
     ctx: CanvasRenderingContext2D,
     cx: number,
     cy: number,
     size: number,
     opacity: number,
+    waveTime: number,
+    color: 'red' | 'green' | null = null,
   ) => {
     if (opacity <= 0.01) return;
 
     ctx.beginPath();
     const vertices = getHexagonVertices(cx, cy, size);
-    ctx.moveTo(vertices[0].x, vertices[0].y);
-    for (let i = 1; i < vertices.length; i++) {
-      ctx.lineTo(vertices[i].x, vertices[i].y);
+
+    // Apply wave offset to each vertex independently for distortion
+    const waveVertices = vertices.map((vertex) => {
+      const rawWave =
+        (Math.sin(waveTime + vertex.x * 0.01 + vertex.y * 0.01) + 1) / 2;
+      const wave = Math.pow(rawWave, 4);
+      const yOffset = -(wave - 0.5) * 12;
+      return { x: vertex.x, y: vertex.y + yOffset };
+    });
+
+    ctx.moveTo(waveVertices[0].x, waveVertices[0].y);
+    for (let i = 1; i < waveVertices.length; i++) {
+      ctx.lineTo(waveVertices[i].x, waveVertices[i].y);
     }
     ctx.closePath();
 
-    ctx.fillStyle = hexagonColor.includes('rgb')
-      ? hexagonColor.replace(')', `, ${opacity})`)
-      : `${hexagonColor}${Math.floor(opacity * 255).toString(16).padStart(2, '0')}`;
+    // Use custom color if provided, otherwise use default hexagonColor
+    let baseColor = hexagonColor;
+    if (color === 'red') {
+      baseColor = '#ef4444'; // Tailwind red-500
+    } else if (color === 'green') {
+      baseColor = '#22c55e'; // Tailwind green-500
+    }
+
+    ctx.fillStyle = baseColor.includes('rgb')
+      ? baseColor.replace(')', `, ${opacity})`)
+      : `${baseColor}${Math.floor(opacity * 255).toString(16).padStart(2, '0')}`;
     ctx.fill();
   }, [hexagonColor, getHexagonVertices]);
 
@@ -126,29 +216,15 @@ export function HexagonGrid({
     size: number,
     wave: number,
   ) => {
-    const brightness = 0.3 + wave * 0.4;
-    const actualSize = size * (0.8 + wave * 0.3);
+    // More noticeable brightness oscillation with wave
+    const brightness = 0.06 + wave * 0.2;
 
     ctx.save();
     ctx.translate(x, y);
 
-    // Draw 4-pointed star
+    // Draw simple dot (circle)
     ctx.beginPath();
-    for (let i = 0; i < 4; i++) {
-      const angle = (Math.PI / 2) * i;
-      const outerX = Math.cos(angle) * actualSize;
-      const outerY = Math.sin(angle) * actualSize;
-      const innerAngle = angle + Math.PI / 4;
-      const innerX = Math.cos(innerAngle) * actualSize * 0.3;
-      const innerY = Math.sin(innerAngle) * actualSize * 0.3;
-
-      if (i === 0) {
-        ctx.moveTo(outerX, outerY);
-      } else {
-        ctx.lineTo(outerX, outerY);
-      }
-      ctx.lineTo(innerX, innerY);
-    }
+    ctx.arc(0, 0, size, 0, Math.PI * 2);
     ctx.closePath();
 
     ctx.fillStyle = starColor.includes('rgba')
@@ -223,12 +299,12 @@ export function HexagonGrid({
       const deltaTime = (currentTime - lastTime) / 1000;
       lastTime = currentTime;
 
-      // Update pan offset
-      offsetRef.current.x = (offsetRef.current.x + panSpeed * deltaTime * 60) % (hexSize * Math.sqrt(3));
-      offsetRef.current.y = (offsetRef.current.y + panSpeed * deltaTime * 60) % (hexSize * 1.5);
+      // Update pan offset - continuous movement northwest (no modulo)
+      offsetRef.current.x += panSpeed * deltaTime * 60;
+      offsetRef.current.y += panSpeed * deltaTime * 60;
 
-      // Update wave time
-      waveTimeRef.current += deltaTime * 2;
+      // Update wave time - slower wave animation
+      waveTimeRef.current += deltaTime * 0.5;
 
       // Clear canvas
       ctx.fillStyle = backgroundColor;
@@ -238,27 +314,63 @@ export function HexagonGrid({
       const hexHeight = hexSize * 2;
       const verticalSpacing = hexHeight * 0.75;
 
-      // Draw stars at vertices with wave effect
+      // Wrap hexagons that have moved off-screen to the northwest
       hexagonsRef.current.forEach((hex) => {
         const screenX = hex.x - offsetRef.current.x;
         const screenY = hex.y - offsetRef.current.y;
 
-        if (
-          screenX > -hexWidth &&
-          screenX < canvasSize.width + hexWidth &&
-          screenY > -hexHeight &&
-          screenY < canvasSize.height + hexHeight
-        ) {
-          const vertices = getHexagonVertices(screenX, screenY, hexSize);
-          vertices.forEach((vertex, i) => {
-            const wave =
-              (Math.sin(waveTimeRef.current + vertex.x * 0.01 + vertex.y * 0.01) + 1) / 2;
-            drawStar(ctx, vertex.x, vertex.y, 2, wave);
-          });
+        // If hexagon is too far off the northwest edge, wrap it to the southeast
+        if (screenX < -hexWidth * 3) {
+          hex.x += hexWidth * (Math.ceil(canvasSize.width / hexWidth) + 4);
+          // Regenerate random properties for wrapped hexagons
+          hex.shouldOscillate = Math.random() < 0.01;
+          hex.isStatic = !hex.shouldOscillate && Math.random() < 0.01;
+          if (hex.shouldOscillate) {
+            hex.oscillationProgress = Math.random();
+            hex.isWaiting = Math.random() < 0.3;
+            hex.waitDuration = 1 + Math.random() * 9;
+            hex.waitTimer = 0;
+            hex.easingType = Math.random() > 0.5 ? 'exponential' : 'logarithmic';
+            hex.oscillationRate = 0.0005 + Math.random() * 0.001;
+            hex.oscillationDirection = Math.random() > 0.5 ? 1 : -1;
+          } else if (hex.isStatic) {
+            hex.opacity = 0.05 + Math.random() * 0.35;
+          } else {
+            hex.opacity = 0;
+          }
+          hex.oscillationDirection = Math.random() > 0.5 ? 1 : -1;
+          hex.shouldHover = Math.random() < staticHexChance;
+          hex.hoverOpacity = 0;
+          hex.hoverTarget = 0;
+          hex.color = null; // Most hexagons don't have color when wrapping
+        }
+        if (screenY < -hexHeight * 3) {
+          hex.y += verticalSpacing * (Math.ceil(canvasSize.height / verticalSpacing) + 4);
+          // Regenerate random properties for wrapped hexagons
+          hex.shouldOscillate = Math.random() < 0.01;
+          hex.isStatic = !hex.shouldOscillate && Math.random() < 0.01;
+          if (hex.shouldOscillate) {
+            hex.oscillationProgress = Math.random();
+            hex.isWaiting = Math.random() < 0.3;
+            hex.waitDuration = 1 + Math.random() * 9;
+            hex.waitTimer = 0;
+            hex.easingType = Math.random() > 0.5 ? 'exponential' : 'logarithmic';
+            hex.oscillationRate = 0.0005 + Math.random() * 0.001;
+            hex.oscillationDirection = Math.random() > 0.5 ? 1 : -1;
+          } else if (hex.isStatic) {
+            hex.opacity = 0.05 + Math.random() * 0.35;
+          } else {
+            hex.opacity = 0;
+          }
+          hex.oscillationDirection = Math.random() > 0.5 ? 1 : -1;
+          hex.shouldHover = Math.random() < staticHexChance;
+          hex.hoverOpacity = 0;
+          hex.hoverTarget = 0;
+          hex.color = null;
         }
       });
 
-      // Update and draw hexagons
+      // Draw hexagons and stars with wave distortion
       hexagonsRef.current.forEach((hex) => {
         const screenX = hex.x - offsetRef.current.x;
         const screenY = hex.y - offsetRef.current.y;
@@ -273,16 +385,59 @@ export function HexagonGrid({
           return;
         }
 
-        // Update flicker
-        if (hex.shouldFlicker) {
-          hex.flickerTimer += deltaTime * 60;
-          if (hex.flickerTimer > 60 + Math.random() * 120) {
-            hex.flickerTimer = 0;
-            hex.targetOpacity = Math.random() > 0.5 ? 0.6 + Math.random() * 0.4 : 0;
-          }
+        // Draw stars at vertices with wave calculated per vertex
+        const vertices = getHexagonVertices(screenX, screenY, hexSize);
+        vertices.forEach((vertex, i) => {
+          const rawWave =
+            (Math.sin(waveTimeRef.current + vertex.x * 0.01 + vertex.y * 0.01) + 1) / 2;
+          const wave = Math.pow(rawWave, 4);
+          const yOffset = -(wave - 0.5) * 12;
+          drawStar(ctx, vertex.x, vertex.y + yOffset, 1.5, wave);
+        });
 
-          if (Math.abs(hex.opacity - hex.targetOpacity) > 0.01) {
-            hex.opacity += (hex.targetOpacity - hex.opacity) * flickerSpeed;
+        // Update oscillating opacity (only if shouldOscillate is true)
+        if (hex.shouldOscillate) {
+          if (hex.isWaiting) {
+            // Wait at 0% opacity
+            hex.opacity = 0;
+            hex.waitTimer += deltaTime;
+
+            // Exit waiting state when timer expires
+            if (hex.waitTimer >= hex.waitDuration) {
+              hex.isWaiting = false;
+              hex.waitTimer = 0;
+              hex.oscillationProgress = 0;
+              hex.oscillationDirection = 1;
+            }
+          } else {
+            // Update progress linearly
+            hex.oscillationProgress += hex.oscillationRate * hex.oscillationDirection * deltaTime * 60;
+
+            // Handle boundaries
+            if (hex.oscillationProgress >= 1.0) {
+              hex.oscillationProgress = 1.0;
+              hex.oscillationDirection = -1;
+            } else if (hex.oscillationProgress <= 0.0) {
+              hex.oscillationProgress = 0.0;
+              // Start waiting period at 0%
+              hex.isWaiting = true;
+              hex.waitDuration = 1 + Math.random() * 9; // 1-10 seconds
+              hex.waitTimer = 0;
+            }
+
+            // Apply easing function to convert progress to opacity (0 to 0.4)
+            let easedProgress = hex.oscillationProgress;
+            if (hex.easingType === 'exponential') {
+              // Exponential ease in-out: fast at ends, slow in middle
+              easedProgress = easedProgress < 0.5
+                ? 2 * easedProgress * easedProgress
+                : 1 - Math.pow(-2 * easedProgress + 2, 2) / 2;
+            } else {
+              // Logarithmic-like ease in-out: slow at ends, fast in middle
+              easedProgress = (Math.sin((easedProgress - 0.5) * Math.PI) + 1) / 2;
+            }
+
+            hex.opacity = easedProgress * 0.4; // Map 0-1 progress to 0-0.4 opacity
           }
         }
 
@@ -301,9 +456,9 @@ export function HexagonGrid({
           hex.hoverOpacity += (hex.hoverTarget - hex.hoverOpacity) * hoverSpeed * deltaTime * 60;
         }
 
-        // Draw hexagon with combined opacity
+        // Draw hexagon with distortion and optional color
         const finalOpacity = Math.max(hex.opacity, hex.hoverOpacity);
-        drawHexagon(ctx, screenX, screenY, hexSize, finalOpacity);
+        drawHexagon(ctx, screenX, screenY, hexSize, finalOpacity, waveTimeRef.current, hex.color);
       });
 
       animationRef.current = requestAnimationFrame(animate);
@@ -321,10 +476,10 @@ export function HexagonGrid({
     };
   }, [
     hexSize,
-    flickerSpeed,
     panSpeed,
     backgroundColor,
     hoverDelay,
+    staticHexChance,
     canvasSize.width,
     canvasSize.height,
     initializeGrid,
