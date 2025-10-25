@@ -16,11 +16,13 @@ interface HexagonGridProps {
 interface Hexagon {
   x: number;
   y: number;
-  hasStaticOpacity: boolean;
   shouldHover: boolean;
   opacity: number;
+  oscillationRate: number;
+  oscillationDirection: number;
   hoverOpacity: number;
   hoverTarget: number;
+  color: 'red' | 'green' | null;
 }
 
 export function HexagonGrid({
@@ -65,24 +67,57 @@ export function HexagonGrid({
     const cols = Math.ceil(width / hexWidth) + 2;
     const rows = Math.ceil(height / verticalSpacing) + 2;
 
+    // Create all hexagons with oscillating transparency
     for (let row = -1; row < rows; row++) {
       for (let col = -1; col < cols; col++) {
         const x = col * hexWidth + (row % 2) * (hexWidth / 2);
         const y = row * verticalSpacing;
 
-        const hasStaticOpacity = Math.random() < staticHexChance;
         const shouldHover = Math.random() < staticHexChance;
 
         hexagons.push({
           x,
           y,
-          hasStaticOpacity,
           shouldHover,
-          // Static opacity between 0 and 0.5 for 1% of hexagons
-          opacity: hasStaticOpacity ? Math.random() * 0.5 : 0,
+          // Start with random opacity between 0.6 and 0.9
+          opacity: 0.6 + Math.random() * 0.3,
+          // Random oscillation rate (0.001 to 0.005 per frame)
+          oscillationRate: 0.001 + Math.random() * 0.004,
+          // Random initial direction
+          oscillationDirection: Math.random() > 0.5 ? 1 : -1,
           hoverOpacity: 0,
           hoverTarget: 0,
+          color: null,
         });
+      }
+    }
+
+    // Add colored hexagons (1%) in pairs or threes
+    const totalHexagons = hexagons.length;
+    const coloredCount = Math.floor(totalHexagons * 0.01);
+    const colored = new Set<number>();
+
+    for (let i = 0; i < coloredCount; i++) {
+      const idx = Math.floor(Math.random() * totalHexagons);
+      if (colored.has(idx)) continue;
+
+      // Random color (red or green)
+      const color = Math.random() > 0.5 ? 'red' : 'green';
+      hexagons[idx].color = color;
+      colored.add(idx);
+
+      // Add 1 or 2 neighbors (making pairs or threes)
+      const neighborsToAdd = Math.random() > 0.5 ? 1 : 2;
+
+      for (let j = 0; j < neighborsToAdd; j++) {
+        // Try to find a nearby hexagon
+        const offset = (j + 1) * (Math.random() > 0.5 ? 1 : -1);
+        const neighborIdx = idx + offset;
+
+        if (neighborIdx >= 0 && neighborIdx < totalHexagons && !colored.has(neighborIdx)) {
+          hexagons[neighborIdx].color = color;
+          colored.add(neighborIdx);
+        }
       }
     }
 
@@ -97,6 +132,7 @@ export function HexagonGrid({
     size: number,
     opacity: number,
     waveTime: number,
+    color: 'red' | 'green' | null = null,
   ) => {
     if (opacity <= 0.01) return;
 
@@ -118,9 +154,17 @@ export function HexagonGrid({
     }
     ctx.closePath();
 
-    ctx.fillStyle = hexagonColor.includes('rgb')
-      ? hexagonColor.replace(')', `, ${opacity})`)
-      : `${hexagonColor}${Math.floor(opacity * 255).toString(16).padStart(2, '0')}`;
+    // Use custom color if provided, otherwise use default hexagonColor
+    let baseColor = hexagonColor;
+    if (color === 'red') {
+      baseColor = '#ef4444'; // Tailwind red-500
+    } else if (color === 'green') {
+      baseColor = '#22c55e'; // Tailwind green-500
+    }
+
+    ctx.fillStyle = baseColor.includes('rgb')
+      ? baseColor.replace(')', `, ${opacity})`)
+      : `${baseColor}${Math.floor(opacity * 255).toString(16).padStart(2, '0')}`;
     ctx.fill();
   }, [hexagonColor, getHexagonVertices]);
 
@@ -239,22 +283,24 @@ export function HexagonGrid({
         if (screenX < -hexWidth * 3) {
           hex.x += hexWidth * (Math.ceil(canvasSize.width / hexWidth) + 4);
           // Regenerate random properties for wrapped hexagons
-          const hasStaticOpacity = Math.random() < staticHexChance;
-          hex.hasStaticOpacity = hasStaticOpacity;
-          hex.opacity = hasStaticOpacity ? Math.random() * 0.5 : 0;
+          hex.opacity = 0.6 + Math.random() * 0.3;
+          hex.oscillationRate = 0.001 + Math.random() * 0.004;
+          hex.oscillationDirection = Math.random() > 0.5 ? 1 : -1;
           hex.shouldHover = Math.random() < staticHexChance;
           hex.hoverOpacity = 0;
           hex.hoverTarget = 0;
+          hex.color = null; // Most hexagons don't have color when wrapping
         }
         if (screenY < -hexHeight * 3) {
           hex.y += verticalSpacing * (Math.ceil(canvasSize.height / verticalSpacing) + 4);
           // Regenerate random properties for wrapped hexagons
-          const hasStaticOpacity = Math.random() < staticHexChance;
-          hex.hasStaticOpacity = hasStaticOpacity;
-          hex.opacity = hasStaticOpacity ? Math.random() * 0.5 : 0;
+          hex.opacity = 0.6 + Math.random() * 0.3;
+          hex.oscillationRate = 0.001 + Math.random() * 0.004;
+          hex.oscillationDirection = Math.random() > 0.5 ? 1 : -1;
           hex.shouldHover = Math.random() < staticHexChance;
           hex.hoverOpacity = 0;
           hex.hoverTarget = 0;
+          hex.color = null;
         }
       });
 
@@ -283,6 +329,18 @@ export function HexagonGrid({
           drawStar(ctx, vertex.x, vertex.y + yOffset, 1.5, wave);
         });
 
+        // Update oscillating opacity
+        hex.opacity += hex.oscillationRate * hex.oscillationDirection * deltaTime * 60;
+
+        // Reverse direction when hitting boundaries (0.6 to 0.9)
+        if (hex.opacity >= 0.9) {
+          hex.opacity = 0.9;
+          hex.oscillationDirection = -1;
+        } else if (hex.opacity <= 0.6) {
+          hex.opacity = 0.6;
+          hex.oscillationDirection = 1;
+        }
+
         // Update hover with delay
         if (hex.shouldHover) {
           const isHovered = isPointInHexagon(
@@ -298,9 +356,9 @@ export function HexagonGrid({
           hex.hoverOpacity += (hex.hoverTarget - hex.hoverOpacity) * hoverSpeed * deltaTime * 60;
         }
 
-        // Draw hexagon with distortion (wave calculated per vertex inside drawHexagon)
+        // Draw hexagon with distortion and optional color
         const finalOpacity = Math.max(hex.opacity, hex.hoverOpacity);
-        drawHexagon(ctx, screenX, screenY, hexSize, finalOpacity, waveTimeRef.current);
+        drawHexagon(ctx, screenX, screenY, hexSize, finalOpacity, waveTimeRef.current, hex.color);
       });
 
       animationRef.current = requestAnimationFrame(animate);
