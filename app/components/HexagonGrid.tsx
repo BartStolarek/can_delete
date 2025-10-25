@@ -17,6 +17,7 @@ interface Hexagon {
   x: number;
   y: number;
   shouldHover: boolean;
+  shouldOscillate: boolean;
   opacity: number;
   oscillationRate: number;
   oscillationDirection: number;
@@ -67,20 +68,22 @@ export function HexagonGrid({
     const cols = Math.ceil(width / hexWidth) + 2;
     const rows = Math.ceil(height / verticalSpacing) + 2;
 
-    // Create all hexagons with oscillating transparency
+    // Create all hexagons - only 1% oscillate, rest are invisible
     for (let row = -1; row < rows; row++) {
       for (let col = -1; col < cols; col++) {
         const x = col * hexWidth + (row % 2) * (hexWidth / 2);
         const y = row * verticalSpacing;
 
         const shouldHover = Math.random() < staticHexChance;
+        const shouldOscillate = Math.random() < 0.01; // Only 1% oscillate
 
         hexagons.push({
           x,
           y,
           shouldHover,
-          // Start with random opacity between 0.6 and 0.9
-          opacity: 0.6 + Math.random() * 0.3,
+          shouldOscillate,
+          // If oscillating, start with random opacity between 0.05 and 0.4, otherwise invisible
+          opacity: shouldOscillate ? 0.05 + Math.random() * 0.35 : 0,
           // Random oscillation rate (0.001 to 0.005 per frame)
           oscillationRate: 0.001 + Math.random() * 0.004,
           // Random initial direction
@@ -104,6 +107,9 @@ export function HexagonGrid({
       // Random color (red or green)
       const color = Math.random() > 0.5 ? 'red' : 'green';
       hexagons[idx].color = color;
+      // Make colored hexagons oscillate
+      hexagons[idx].shouldOscillate = true;
+      hexagons[idx].opacity = 0.05 + Math.random() * 0.35;
       colored.add(idx);
 
       // Add 1 or 2 neighbors (making pairs or threes)
@@ -116,6 +122,8 @@ export function HexagonGrid({
 
         if (neighborIdx >= 0 && neighborIdx < totalHexagons && !colored.has(neighborIdx)) {
           hexagons[neighborIdx].color = color;
+          hexagons[neighborIdx].shouldOscillate = true;
+          hexagons[neighborIdx].opacity = 0.05 + Math.random() * 0.35;
           colored.add(neighborIdx);
         }
       }
@@ -283,7 +291,8 @@ export function HexagonGrid({
         if (screenX < -hexWidth * 3) {
           hex.x += hexWidth * (Math.ceil(canvasSize.width / hexWidth) + 4);
           // Regenerate random properties for wrapped hexagons
-          hex.opacity = 0.6 + Math.random() * 0.3;
+          hex.shouldOscillate = Math.random() < 0.01;
+          hex.opacity = hex.shouldOscillate ? 0.05 + Math.random() * 0.35 : 0;
           hex.oscillationRate = 0.001 + Math.random() * 0.004;
           hex.oscillationDirection = Math.random() > 0.5 ? 1 : -1;
           hex.shouldHover = Math.random() < staticHexChance;
@@ -294,7 +303,8 @@ export function HexagonGrid({
         if (screenY < -hexHeight * 3) {
           hex.y += verticalSpacing * (Math.ceil(canvasSize.height / verticalSpacing) + 4);
           // Regenerate random properties for wrapped hexagons
-          hex.opacity = 0.6 + Math.random() * 0.3;
+          hex.shouldOscillate = Math.random() < 0.01;
+          hex.opacity = hex.shouldOscillate ? 0.05 + Math.random() * 0.35 : 0;
           hex.oscillationRate = 0.001 + Math.random() * 0.004;
           hex.oscillationDirection = Math.random() > 0.5 ? 1 : -1;
           hex.shouldHover = Math.random() < staticHexChance;
@@ -329,16 +339,18 @@ export function HexagonGrid({
           drawStar(ctx, vertex.x, vertex.y + yOffset, 1.5, wave);
         });
 
-        // Update oscillating opacity
-        hex.opacity += hex.oscillationRate * hex.oscillationDirection * deltaTime * 60;
+        // Update oscillating opacity (only if shouldOscillate is true)
+        if (hex.shouldOscillate) {
+          hex.opacity += hex.oscillationRate * hex.oscillationDirection * deltaTime * 60;
 
-        // Reverse direction when hitting boundaries (0.6 to 0.9)
-        if (hex.opacity >= 0.9) {
-          hex.opacity = 0.9;
-          hex.oscillationDirection = -1;
-        } else if (hex.opacity <= 0.6) {
-          hex.opacity = 0.6;
-          hex.oscillationDirection = 1;
+          // Reverse direction when hitting boundaries (0.05 to 0.4)
+          if (hex.opacity >= 0.4) {
+            hex.opacity = 0.4;
+            hex.oscillationDirection = -1;
+          } else if (hex.opacity <= 0.05) {
+            hex.opacity = 0.05;
+            hex.oscillationDirection = 1;
+          }
         }
 
         // Update hover with delay
