@@ -139,14 +139,9 @@ export function HexagonGrid({
       // Random color (red or green)
       const color = Math.random() > 0.5 ? 'red' : 'green';
       hexagons[idx].color = color;
-      // Make colored hexagons oscillate with new properties
-      hexagons[idx].shouldOscillate = true;
-      hexagons[idx].oscillationProgress = Math.random();
-      hexagons[idx].isWaiting = Math.random() < 0.3;
-      hexagons[idx].waitDuration = 1 + Math.random() * 9;
-      hexagons[idx].easingType = Math.random() > 0.5 ? 'exponential' : 'logarithmic';
-      hexagons[idx].oscillationRate = 0.0005 + Math.random() * 0.001;
-      hexagons[idx].oscillationDirection = Math.random() > 0.5 ? 1 : -1;
+      // Make colored hexagons static with fixed random transparency (5-40%)
+      hexagons[idx].isStatic = true;
+      hexagons[idx].opacity = 0.05 + Math.random() * 0.35;
       colored.add(idx);
 
       // Add 1 or 2 neighbors (making pairs or threes)
@@ -159,13 +154,8 @@ export function HexagonGrid({
 
         if (neighborIdx >= 0 && neighborIdx < totalHexagons && !colored.has(neighborIdx)) {
           hexagons[neighborIdx].color = color;
-          hexagons[neighborIdx].shouldOscillate = true;
-          hexagons[neighborIdx].oscillationProgress = Math.random();
-          hexagons[neighborIdx].isWaiting = Math.random() < 0.3;
-          hexagons[neighborIdx].waitDuration = 1 + Math.random() * 9;
-          hexagons[neighborIdx].easingType = Math.random() > 0.5 ? 'exponential' : 'logarithmic';
-          hexagons[neighborIdx].oscillationRate = 0.0005 + Math.random() * 0.001;
-          hexagons[neighborIdx].oscillationDirection = Math.random() > 0.5 ? 1 : -1;
+          hexagons[neighborIdx].isStatic = true;
+          hexagons[neighborIdx].opacity = 0.05 + Math.random() * 0.35;
           colored.add(neighborIdx);
         }
       }
