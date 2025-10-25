@@ -84,8 +84,8 @@ export function HexagonGrid({
           shouldOscillate,
           // If oscillating, start with random opacity between 0.05 and 0.4, otherwise invisible
           opacity: shouldOscillate ? 0.05 + Math.random() * 0.35 : 0,
-          // Random oscillation rate (0.001 to 0.005 per frame)
-          oscillationRate: 0.001 + Math.random() * 0.004,
+          // Random oscillation rate (0.001 to 0.0022 per frame) - slow rate
+          oscillationRate: 0.001 + Math.random() * 0.0012,
           // Random initial direction
           oscillationDirection: Math.random() > 0.5 ? 1 : -1,
           hoverOpacity: 0,
@@ -293,7 +293,7 @@ export function HexagonGrid({
           // Regenerate random properties for wrapped hexagons
           hex.shouldOscillate = Math.random() < 0.01;
           hex.opacity = hex.shouldOscillate ? 0.05 + Math.random() * 0.35 : 0;
-          hex.oscillationRate = 0.001 + Math.random() * 0.004;
+          hex.oscillationRate = 0.001 + Math.random() * 0.0012;
           hex.oscillationDirection = Math.random() > 0.5 ? 1 : -1;
           hex.shouldHover = Math.random() < staticHexChance;
           hex.hoverOpacity = 0;
@@ -305,7 +305,7 @@ export function HexagonGrid({
           // Regenerate random properties for wrapped hexagons
           hex.shouldOscillate = Math.random() < 0.01;
           hex.opacity = hex.shouldOscillate ? 0.05 + Math.random() * 0.35 : 0;
-          hex.oscillationRate = 0.001 + Math.random() * 0.004;
+          hex.oscillationRate = 0.001 + Math.random() * 0.0012;
           hex.oscillationDirection = Math.random() > 0.5 ? 1 : -1;
           hex.shouldHover = Math.random() < staticHexChance;
           hex.hoverOpacity = 0;
